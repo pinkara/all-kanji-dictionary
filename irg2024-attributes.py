@@ -32,7 +32,7 @@ def scrape_and_generate_json():
         print("2. Analyse des données (Radical & Traits)...")
 
         # Analyse du HTML ligne par ligne pour trouver les motifs
-        # Format typique dans le tableau : <td>01201...</td> ... <td>85.9</td>
+        # On découpe par ligne de tableau pour isoler chaque caractère
         lines = html_content.split('</tr>')
         
         for line in lines:
@@ -45,20 +45,31 @@ def scrape_and_generate_json():
             char_id = id_match.group(1)
             
             # 2. On cherche le pattern Radical.Traits
-            # ex: 85.9 ou 140.4.2
-            # On cherche un nombre (1-3 chiffres), un point, un nombre (1-2 chiffres)
-            attr_match = re.search(r'(\d{1,3})\.(\d{1,2})', line)
+            # AMÉLIORATION : On utilise findall pour voir tous les candidats potentiels
+            # et on cherche spécifiquement après un chevron '>' pour éviter les attributs
+            matches = re.findall(r'>\s*(\d{1,3})\.(\d{1,2})', line)
             
-            if attr_match:
-                rad = int(attr_match.group(1))
-                strokes = int(attr_match.group(2))
+            found_rad = None
+            found_str = None
+            
+            # On parcourt les candidats pour trouver le premier radical valide (1-214)
+            for m in matches:
+                r_val = int(m[0])
+                s_val = int(m[1])
                 
+                # Vérification de cohérence (Radical Kangxi standard)
+                if 1 <= r_val <= 214:
+                    found_rad = r_val
+                    found_str = s_val
+                    break # On prend le premier valide trouvé
+            
+            if found_rad is not None:
                 scraped_data[char_id] = {
-                    'rad': rad,
-                    'str': strokes
+                    'rad': found_rad,
+                    'str': found_str
                 }
 
-        print(f"   -> {len(scraped_data)} caractères identifiés dans la page.")
+        print(f"   -> {len(scraped_data)} caractères identifiés avec succès.")
 
     except Exception as e:
         print(f"   [ERREUR] Impossible de lire le site : {e}")
