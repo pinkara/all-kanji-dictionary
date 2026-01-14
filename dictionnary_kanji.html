@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dictionnaire CJK Unifié (Base + Ext A-J)</title>
+    
+    <!-- 1. CHARGEMENT DES LIBRAIRIES (CDN) -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- 2. STYLES PERSONNALISÉS -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700&family=Noto+Sans+SC:wght@400;700&display=swap');
+
+        body {
+            font-family: 'Noto Sans SC', system-ui, sans-serif;
+            background-color: #f8fafc;
+        }
+
+        /* Polices CJK prioritaires (Ajout de Plangothic P2) */
+        .font-cjk {
+            font-family: "Plangothic P2", "HanaMinA", "HanaMinB", "SimSun-ExtB", "MingLiU-ExtB", "Nom Na Tong", "Noto Serif JP", serif;
+        }
+
+        /* Animations */
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        .animate-fadeIn { animation: fadeIn 0.2s ease-out forwards; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        // --- GESTION EXTENSION J (HOOK) ---
+        const useExtJFont = (item) => {
+            const hex = item.cp.toString(16).toUpperCase();
+            // Détection plage Ext-J (U+323B0 - U+3347F)
+            const isExtJ = (item.cp >= 0x323B0 && item.cp <= 0x3347F) || item.is_ext_j;
+
+            useEffect(() => {
+                if (isExtJ) {
+                    const hexLower = item.cp.toString(16).toLowerCase();
+                    const fontName = `ExtJ-${hex}`;
+                    const styleId = `font-style-${hex}`;
+
+                    if (!document.getElementById(styleId)) {
+                        const style = document.createElement('style');
+                        style.id = styleId;
+                        style.textContent = `
+                            @font-face {
+                                font-family: "${fontName}";
+                                src: url("u${hexLower}.ttf");
+                            }
+                        `;
+                        document.head.appendChild(style);
+                    }
+                }
+            }, [isExtJ, item.cp]);
+
+            return {
+                isExtJ,
+                style: isExtJ ? { fontFamily: `"ExtJ-${hex}", "Plangothic P2", serif` } : {},
+                char: isExtJ ? '〓' : item.char
+            };
+        };
+
+        // --- COMPOSANT : CARTE ---
+        const CharCard = ({ item, onClick }) => {
+            const hex = item.cp.toString(16).toUpperCase();
+            const { isExtJ, style, char } = useExtJFont(item);
+            
+            return (
+                <div 
+                    onClick={() => onClick(item)}
+                    className="bg-white rounded-lg shadow-sm border border-slate-200 p-2 flex flex-col items-center hover:shadow-md hover:border-blue-400 cursor-pointer transition-all h-32 justify-between group relative overflow-hidden"
+                >
+                    <div className="text-[10px] text-slate-400 font-mono self-end group-hover:text-blue-500">U+{hex}</div>
+                    <div className="text-5xl font-cjk text-slate-800 z-10" style={style}>
+                        {char}
+                    </div>
+                    <div className="flex gap-2 text-[10px] text-slate-500 font-bold bg-slate-100 px-2 py-0.5 rounded-full mt-1">
+                        <span>R{item.rad}</span>
+                        <span className="border-l border-slate-300 pl-2">+{item.str}</span>
+                    </div>
+                    {isExtJ && <div className="absolute top-0 left-0 w-2 h-2 bg-amber-500 rounded-br-full" title="Extension J (Police locale)"></div>}
+                </div>
+            );
+        };
+
+        // --- COMPOSANT : MODALE ---
+        const DetailModal = ({ item, onClose }) => {
+            if (!item) return null;
+            const hex = item.cp.toString(16).toUpperCase();
+            const { isExtJ, style, char } = useExtJFont(item);
+
+            useEffect(() => {
+                const handleEsc = (e) => { if (e.key === 'Escape') onClose(); };
+                window.addEventListener('keydown', handleEsc);
+                return () => window.removeEventListener('keydown', handleEsc);
+            }, [onClose]);
+
+            return (
+                <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm" onClick={onClose}>
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full flex flex-col md:flex-row overflow-hidden animate-fadeIn" onClick={e => e.stopPropagation()}>
+                        
+                        {/* Gauche : Caractère */}
+                        <div className="bg-slate-50 p-10 flex items-center justify-center md:w-5/12 border-b md:border-b-0 md:border-r border-slate-200 relative">
+                            <div className="text-9xl font-cjk text-slate-800 leading-none" style={style}>
+                                {char}
+                            </div>
+                            <div className="absolute top-4 left-4 text-xs font-mono text-slate-500 bg-white px-2 py-1 rounded border border-slate-200">U+{hex}</div>
+                        </div>
+
+                        {/* Droite : Infos */}
+                        <div className="p-8 md:w-7/12 flex flex-col gap-5">
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <h2 className="text-2xl font-bold text-slate-800">Détails</h2>
+                                    <p className="text-xs text-slate-500">CJK Unified Ideograph</p>
+                                </div>
+                                <button onClick={onClose} className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-red-500 transition-colors">
+                                    <i className="fa-solid fa-xmark text-lg"></i>
+                                </button>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">
+                                    <div className="text-[10px] text-blue-500 uppercase font-bold mb-1">Radical</div>
+                                    <div className="text-lg font-bold text-blue-900">R{item.rad} <span className="text-sm font-normal text-blue-600">+{item.str}</span></div>
+                                </div>
+                                <div className="bg-purple-50 p-3 rounded-lg border border-purple-100">
+                                    <div className="text-[10px] text-purple-500 uppercase font-bold mb-1">Total (Est.)</div>
+                                    <div className="text-lg font-bold text-purple-900">~{item.str + 2} <span className="text-sm font-normal">coups</span></div>
+                                </div>
+                            </div>
+
+                            <div className="space-y-1">
+                                <div className="text-xs font-bold text-slate-400 uppercase">Définition</div>
+                                <div className="text-slate-700 bg-slate-50 p-3 rounded border border-slate-100 text-sm italic">
+                                    {item.def || "Aucune définition disponible."}
+                                </div>
+                            </div>
+                            
+                            {item.pinyin && (
+                                <div className="space-y-1">
+                                    <div className="text-xs font-bold text-slate-400 uppercase">Lecture (Pinyin)</div>
+                                    <div className="text-lg text-emerald-600 font-serif font-bold">{item.pinyin}</div>
+                                </div>
+                            )}
+
+                             {isExtJ && (
+                                <div className="mt-auto pt-3 text-xs text-amber-700 flex items-center gap-2 bg-amber-50 p-2 rounded border border-amber-100">
+                                    <i className="fa-solid fa-triangle-exclamation"></i>
+                                    <span>Extension J (Police locale : u{item.cp.toString(16).toLowerCase()}.ttf)</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- APP PRINCIPALE ---
+        function App() {
+            const [db, setDb] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [error, setError] = useState(null); // Stocke le type d'erreur
+            
+            const [searchTerm, setSearchTerm] = useState("");
+            const [selectedItem, setSelectedItem] = useState(null);
+            const [page, setPage] = useState(1);
+            const itemsPerPage = 60;
+
+            useEffect(() => {
+                loadDefaultFile();
+            }, []);
+
+            const loadDefaultFile = () => {
+                setLoading(true);
+                setError(null);
+                fetch('cjk_db.json')
+                    .then(res => {
+                        if (!res.ok) throw new Error("Fichier introuvable ou bloqué par le navigateur.");
+                        return res.json();
+                    })
+                    .then(data => {
+                        setDb(data);
+                        setLoading(false);
+                    })
+                    .catch(err => {
+                        console.error("Chargement auto échoué:", err);
+                        // On définit l'erreur pour afficher le bouton d'upload manuel
+                        setError("LOCAL_BLOCK"); 
+                        setLoading(false);
+                    });
+            };
+
+            // Fonction pour charger le fichier manuellement via l'input file
+            const handleFileUpload = (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                setLoading(true);
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const json = JSON.parse(e.target.result);
+                        setDb(json);
+                        setError(null); // Succès !
+                        setLoading(false);
+                    } catch (parseErr) {
+                        alert("Le fichier sélectionné n'est pas un JSON valide.");
+                        setLoading(false);
+                    }
+                };
+                reader.readAsText(file);
+            };
+
+            const filteredData = useMemo(() => {
+                if (!searchTerm) return db;
+                const lower = searchTerm.toLowerCase().trim();
+                return db.filter(item => {
+                    if (item.char === lower) return true;
+                    if (item.cp.toString(16).includes(lower)) return true;
+                    if (item.def && item.def.toLowerCase().includes(lower)) return true;
+                    if (lower.startsWith('r') && item.rad == lower.substring(1)) return true;
+                    return false;
+                });
+            }, [db, searchTerm]);
+
+            const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+            const currentItems = useMemo(() => {
+                const start = (page - 1) * itemsPerPage;
+                return filteredData.slice(start, start + itemsPerPage);
+            }, [filteredData, page]);
+
+            useEffect(() => setPage(1), [searchTerm]);
+
+            return (
+                <div className="min-h-screen flex flex-col font-sans text-slate-900">
+                    
+                    {/* Header */}
+                    <header className="bg-slate-900 text-white p-4 md:p-6 shadow-lg sticky top-0 z-20">
+                        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+                            <div className="flex items-center gap-3">
+                                <div className="bg-blue-600 w-10 h-10 rounded-lg flex items-center justify-center text-white text-xl">
+                                    <i className="fa-solid fa-book-open"></i>
+                                </div>
+                                <div>
+                                    <h1 className="text-xl font-bold">Dictionnaire CJK</h1>
+                                    <div className="flex gap-2 text-xs text-slate-400 font-mono">
+                                        <span className="bg-slate-800 px-1 rounded">Unicode 16.0</span>
+                                        <span>Ext A-J</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Recherche (désactivée si pas de données) */}
+                            <div className="relative w-full md:w-96">
+                                <input
+                                    type="text"
+                                    placeholder="Recherche (Caractère, Hex, R10...)"
+                                    className="w-full pl-10 pr-10 py-2.5 rounded-full bg-slate-800 border border-slate-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-500 disabled:opacity-50"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    disabled={!!error || loading}
+                                />
+                                <i className="fa-solid fa-magnifying-glass absolute left-3.5 top-3.5 text-slate-500"></i>
+                                {searchTerm && (
+                                    <button onClick={() => setSearchTerm('')} className="absolute right-3 top-3 text-slate-500 hover:text-white">
+                                        <i className="fa-solid fa-circle-xmark"></i>
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </header>
+
+                    {/* ÉCRAN D'ERREUR AVEC UPLOAD MANUEL */}
+                    {error === "LOCAL_BLOCK" && !loading && (
+                        <div className="flex-1 flex items-center justify-center bg-slate-100 p-4">
+                            <div className="bg-white p-8 rounded-xl shadow-lg max-w-lg text-center border border-slate-200">
+                                <div className="bg-amber-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-amber-600">
+                                    <i className="fa-solid fa-lock text-2xl"></i>
+                                </div>
+                                <h2 className="text-2xl font-bold mb-2 text-slate-800">Sécurité du Navigateur</h2>
+                                <p className="text-slate-600 mb-6">
+                                    Le navigateur bloque le chargement automatique du fichier <code>cjk_db.json</code> pour des raisons de sécurité (restriction CORS sur les fichiers locaux).
+                                </p>
+                                
+                                <div className="bg-slate-50 p-4 rounded-lg border border-dashed border-slate-300">
+                                    <label className="block mb-2 font-bold text-slate-700">Solution : Sélectionnez le fichier manuellement</label>
+                                    <p className="text-xs text-slate-500 mb-4">Choisissez le fichier <code>cjk_db.json</code> qui se trouve dans votre dossier.</p>
+                                    
+                                    <input 
+                                        type="file" 
+                                        accept=".json"
+                                        onChange={handleFileUpload}
+                                        className="block w-full text-sm text-slate-500
+                                            file:mr-4 file:py-2 file:px-4
+                                            file:rounded-full file:border-0
+                                            file:text-sm file:font-semibold
+                                            file:bg-blue-50 file:text-blue-700
+                                            hover:file:bg-blue-100 cursor-pointer"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Contenu Principal (si pas d'erreur) */}
+                    {!error && (
+                        <main className="flex-1 max-w-7xl mx-auto w-full p-4 md:p-6">
+                            {loading ? (
+                                <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                                    <i className="fa-solid fa-spinner fa-spin text-4xl mb-4 text-blue-500"></i>
+                                    <p>Chargement de la base de données...</p>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="mb-4 flex justify-between items-end text-slate-600 border-b border-slate-200 pb-2">
+                                        <div className="text-sm font-bold">{filteredData.length.toLocaleString()} résultats</div>
+                                        {totalPages > 1 && <div className="text-xs bg-slate-100 px-2 py-1 rounded">Page {page} / {totalPages}</div>}
+                                    </div>
+
+                                    {currentItems.length > 0 ? (
+                                        <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 gap-3 pb-10">
+                                            {currentItems.map(item => (
+                                                <CharCard key={item.cp} item={item} onClick={setSelectedItem} />
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="text-center py-20 bg-white rounded-xl border-2 border-dashed border-slate-200 text-slate-500">
+                                            Aucun résultat trouvé.
+                                        </div>
+                                    )}
+
+                                    {/* Pagination */}
+                                    {totalPages > 1 && (
+                                        <div className="flex justify-center gap-2 pb-8">
+                                            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-4 py-2 bg-white border border-gray-300 rounded hover:bg-slate-50 disabled:opacity-50 text-sm font-bold text-slate-700">
+                                                <i className="fa-solid fa-chevron-left mr-1"></i> Précédent
+                                            </button>
+                                            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="px-4 py-2 bg-white border border-gray-300 rounded hover:bg-slate-50 disabled:opacity-50 text-sm font-bold text-slate-700">
+                                                Suivant <i className="fa-solid fa-chevron-right ml-1"></i>
+                                            </button>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                        </main>
+                    )}
+
+                    {/* Modal Detail */}
+                    {selectedItem && <DetailModal item={selectedItem} onClose={() => setSelectedItem(null)} />}
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
